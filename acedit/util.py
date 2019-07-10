@@ -295,26 +295,27 @@ class Utilities:
 
         if os.path.isdir(testcases_path):
             num_cases = len(os.listdir(testcases_path)) / 2
-            results, expected_outputs, user_outputs = [], [], []
+            results, expected_outputs, user_outputs = [''] * num_cases, [''] * num_cases, [''] * num_cases
 
-            if extension in ['c', 'cpp', 'java', 'py', 'hs']:
+            if extension in ['c', 'cpp', 'java', 'py', 'hs', 'rb', 'kt']:
 
                 compiler = {
                     'hs': 'ghc --make -O -dynamic -o ' + basename,
                     'py': None,
                     'rb': None,
                     'c': 'gcc -static -DONLINE_JUDGE -fno-asm -lm -s -O2 -o ' + basename,
-                    'cpp': 'g++ -static -DONLINE_JUDGE -lm -s -x c++ -O2 -std=c++14 -o ' + basename,
-                    'java': 'javac -d .'
+                    'cpp': 'clang++ -DONLINE_JUDGE -include /home/igorjan/206round/bits.h -O2 -std=c++17 -o ' + basename,
+                    'java': 'javac -d .',
+                    'kt': 'kotlinc -d .'
                 }[extension]
-                print compiler
                 execute_command = {
                     'py': 'python ' + basename + '.' + extension,
                     'rb': 'ruby ' + basename + '.' + extension,
                     'hs': './' + basename,
                     'c': './' + basename,
                     'cpp': './' + basename,
-                    'java': 'java -DONLINE_JUDGE=true -Duser.language=en -Duser.region=US -Duser.variant=US ' + basename
+                    'java': 'java -DONLINE_JUDGE=true -Duser.language=en -Duser.region=US -Duser.variant=US ' + basename,
+                    'kt': 'kotlin -DONLINE_JUDGE=true -Duser.language=en -Duser.region=US -Duser.variant=US ' + basename + 'Kt'
                 }[extension]
                 if compiler is None:
                     compile_status = 0
@@ -367,7 +368,7 @@ class Utilities:
                     sys.exit(0)
 
             else:
-                print 'Supports only C, C++, Python and Java as of now.'
+                print 'Supports only C, C++, Python, Java and Kotlin as of now.'
                 sys.exit(0)
 
             from terminaltables import AsciiTable
@@ -470,6 +471,7 @@ class Codeforces:
             pre = inp.find('pre').decode_contents()
             pre = reduce(lambda a, kv: a.replace(*kv), repls, pre)
             pre = re.sub('<[^<]+?>', '', pre)
+            pre = re.sub('^\s+', '', pre)
             formatted_inputs += [pre]
 
         for out in outputs:
