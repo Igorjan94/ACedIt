@@ -7,8 +7,7 @@ try:
     import requests as rq
     import grequests as grq
     from argparse import ArgumentParser
-except ImportError as e:
-    print e
+except:
     err = """
     You haven't installed the required dependencies.
     Run 'python setup.py install' to install the dependencies.
@@ -26,6 +25,12 @@ class Utilities:
         'RED': '\033[91m',
         'ENDC': '\033[0m',
         'BOLD': '\033[1m',
+    }
+    verdicts = {
+        'AC': colors['BOLD'] + colors['GREEN'] + 'AC' + colors['ENDC'],
+        'WA': colors['BOLD'] + colors['RED'] + 'WA' + colors['ENDC'],
+        'RTE': colors['BOLD'] + colors['RED'] + 'RTE' + colors['ENDC'],
+        'TLE': colors['BOLD'] + colors['YELLOW'] + 'TLE' + colors['ENDC']
     }
 
     @staticmethod
@@ -53,6 +58,11 @@ class Utilities:
                             dest='force',
                             action='store_true',
                             help='Force download the test cases, even if they are cached')
+
+        parser.add_argument('--add-test',
+                            dest='add_test',
+                            action='store_true',
+                            help='Add test to specific problem of contest')
 
         parser.add_argument('--run',
                             dest='source_file',
@@ -104,6 +114,7 @@ class Utilities:
         flags['source'] = args.source_file
         flags['default_site'] = args.default_site
         flags['default_contest'] = args.default_contest
+        flags['add_test'] = args.add_test
 
         return flags
 
@@ -164,6 +175,30 @@ class Utilities:
             print 'Done.'
 
     @staticmethod
+    def get_long_input(message):
+        print message
+        lines = []
+        while True:
+            try:
+                line = raw_input()
+                if line == '' and len(lines) > 0 and lines[-1] == '':
+                    break
+            except EOFError:
+                lines.append('')
+                break
+            lines.append(line)
+        return '\n'.join(lines)
+
+    @staticmethod
+    def add_test(args):
+        print 'Adding new test to %s (contest: %s, problem: %s)' % (args['site'], args['contest'], args['problem'])
+        inputs = [Utilities.get_long_input('Specify input (^D or two consecutive empty lines to stop):')]
+        outputs = [Utilities.get_long_input('Specify output (^D or two consecutive empty lines to stop):')]
+        is_in_cache = Utilities.check_cache(args['site'], args['contest'], args['problem'])
+        Utilities.store_files(args['site'], args['contest'], args['problem'], inputs, outputs)
+        print 'Test is successfully added'
+
+    @staticmethod
     def store_files(site, contest, problem, inputs, outputs):
         """
         Method to store the test cases in files
@@ -171,33 +206,36 @@ class Utilities:
 
         # Handle case for SPOJ specially as it does not have contests
         contest = '' if site == 'spoj' else contest
+        testcases_path = os.path.join(Utilities.cache_dir, site, contest, problem)
+        num_cases = len(os.listdir(testcases_path)) / 2
 
         for i, inp in enumerate(inputs):
-            filename = os.path.join(
-                Utilities.cache_dir, site, contest, problem, 'Input' + str(i))
+            filename = os.path.join(testcases_path, 'Input' + str(i + num_cases))
             with open(filename, 'w') as handler:
                 handler.write(inp)
 
         for i, out in enumerate(outputs):
-            filename = os.path.join(
-                Utilities.cache_dir, site, contest, problem, 'Output' + str(i))
+            filename = os.path.join(testcases_path, 'Output' + str(i + num_cases))
             with open(filename, 'w') as handler:
                 handler.write(out)
+
+    @staticmethod
+    def get_platform(args):
+        if args['site'] == 'codeforces':
+            return Codeforces(args)
+        elif args['site'] == 'codechef':
+            return Codechef(args)
+        elif args['site'] == 'spoj':
+            return Spoj(args)
+        else:
+            return Hackerrank(args)
 
     @staticmethod
     def download_problem_testcases(args):
         """
         Download test cases for a given problem
         """
-        if args['site'] == 'codeforces':
-            platform = Codeforces(args)
-        elif args['site'] == 'codechef':
-            platform = Codechef(args)
-        elif args['site'] == 'spoj':
-            platform = Spoj(args)
-        else:
-            platform = Hackerrank(args)
-
+        platform = Utilities.get_platform(args)
         is_in_cache = Utilities.check_cache(
             platform.site, platform.contest, platform.problem)
 
@@ -212,13 +250,7 @@ class Utilities:
         """
         Download test cases for all problems in a given contest
         """
-        if args['site'] == 'codeforces':
-            platform = Codeforces(args)
-        elif args['site'] == 'codechef':
-            platform = Codechef(args)
-        elif args['site'] == 'hackerrank':
-            platform = Hackerrank(args)
-
+        platform = Utilities.get_platform(args)
         Utilities.check_cache(
             platform.site, platform.contest, platform.problem)
 
@@ -270,6 +302,36 @@ class Utilities:
                 # rmtree(path)
 
         print 'Done. Exiting gracefully.'
+
+    @staticmethod
+    def run_command_on_one_test(testcases_path, testcase_number, execute_command):
+        status = os.system('timeout 2s ' + execute_command + ' < ' + os.path.join(
+            testcases_path, 'Input' + str(testcase_number)) + ' > temp_output' + str(testcase_number))
+        user_output = ''
+        with open(os.path.join(testcases_path, 'Output' + str(testcase_number)), 'r') as out_handler:
+            expected_output = out_handler.read().strip().split('\n')
+            expected_output = '\n'.join([line.strip() for line in expected_output])
+            if status == 124:
+                # Time Limit Exceeded
+                results = Utilities.verdicts['TLE']
+
+            elif status == 0:
+                # Ran successfully
+                with open('temp_output' + str(testcase_number), 'r') as temp_handler:
+                    user_output = temp_handler.read().strip().split('\n')
+                    user_output = '\n'.join([line.strip() for line in user_output])
+
+                if expected_output == user_output:
+                    # All Correct
+                    results = Utilities.verdicts['AC']
+                else:
+                    # Wrong Answer
+                    results = Utilities.verdicts['WA']
+
+            else:
+                # Runtime Error
+                results = Utilities.verdicts['RTE']
+        return (expected_output, user_output, results)
 
     @staticmethod
     def run_solution(args):
@@ -326,40 +388,7 @@ class Utilities:
 
                     # Compiled successfully
                     for i in xrange(num_cases):
-                        status = os.system('timeout 2s ' + execute_command + ' < ' + os.path.join(
-                            testcases_path, 'Input' + str(i)) + ' > temp_output' + str(i))
-                        if status == 124:
-                            # Time Limit Exceeded
-                            results += [Utilities.colors['BOLD'] + Utilities.colors[
-                                'YELLOW'] + 'TLE' + Utilities.colors['ENDC']]
-
-                        elif status == 0:
-                            # Ran successfully
-                            with open('temp_output' + str(i), 'r') as temp_handler, open(os.path.join(testcases_path, 'Output' + str(i)), 'r') as out_handler:
-                                expected_output = out_handler.read().strip().split('\n')
-                                user_output = temp_handler.read().strip().split('\n')
-
-                                expected_output = '\n'.join(
-                                    [line.strip() for line in expected_output])
-                                user_output = '\n'.join(
-                                    [line.strip() for line in user_output])
-
-                                expected_outputs += [expected_output]
-                                user_outputs += [user_output]
-
-                            if expected_output == user_output:
-                                # All Correct
-                                results += [Utilities.colors['BOLD'] + Utilities.colors[
-                                    'GREEN'] + 'AC' + Utilities.colors['ENDC']]
-                            else:
-                                # Wrong Answer
-                                results += [Utilities.colors['BOLD'] + Utilities.colors[
-                                    'RED'] + 'WA' + Utilities.colors['ENDC']]
-
-                        else:
-                            # Runtime Error
-                            results += [Utilities.colors['BOLD'] +
-                                        Utilities.colors['RED'] + 'RTE' + Utilities.colors['ENDC']]
+                        expected_outputs[i], user_outputs[i], results[i] = Utilities.run_command_on_one_test(testcases_path, i, execute_command)
                 else:
                     # Compilation error occurred
                     message = Utilities.colors['BOLD'] + Utilities.colors[
@@ -376,13 +405,6 @@ class Utilities:
                            'Expected Output', 'Your Output', 'Result']]
 
             inputs = Utilities.input_file_to_string(testcases_path, num_cases)
-
-            if len(expected_outputs) == 0:
-                # Compilation error occurred
-                message = Utilities.colors['BOLD'] + Utilities.colors[
-                    'RED'] + 'Something bad happened. Not run against test cases' + Utilities.colors['ENDC'] + '.'
-                print message
-                sys.exit(0)
 
             for i in xrange(num_cases):
 
@@ -467,18 +489,17 @@ class Codeforces:
 
         formatted_inputs, formatted_outputs = [], []
 
-        for inp in inputs:
+        def getContent(inp):
             pre = inp.find('pre').decode_contents()
             pre = reduce(lambda a, kv: a.replace(*kv), repls, pre)
             pre = re.sub('<[^<]+?>', '', pre)
-            pre = re.sub('^\s+', '', pre)
-            formatted_inputs += [pre]
+            return re.sub(r'^\s*', '', pre)
+
+        for inp in inputs:
+            formatted_inputs += [getContent(inp)]
 
         for out in outputs:
-            pre = out.find('pre').decode_contents()
-            pre = reduce(lambda a, kv: a.replace(*kv), repls, pre)
-            pre = re.sub('<[^<]+?>', '', pre)
-            formatted_outputs += [pre]
+            formatted_outputs += [getContent(out)]
 
         # print 'Inputs', formatted_inputs
         # print 'Outputs', formatted_outputs
