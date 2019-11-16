@@ -199,7 +199,11 @@ class Utilities:
         print 'Test is successfully added'
 
     @staticmethod
-    def store_files(site, contest, problem, inputs, outputs):
+    def getTestCasesCount(p):
+        return len([f for f in os.listdir(p) if f.startswith('Input')])
+
+    @staticmethod
+    def store_files(site, contest, problem, inputs, outputs, statement=None):
         """
         Method to store the test cases in files
         """
@@ -207,17 +211,19 @@ class Utilities:
         # Handle case for SPOJ specially as it does not have contests
         contest = '' if site == 'spoj' else contest
         testcases_path = os.path.join(Utilities.cache_dir, site, contest, problem)
-        num_cases = len(os.listdir(testcases_path)) / 2
+        num_cases = Utilities.getTestCasesCount(testcases_path)
+        def writeFile(filename, content):
+            with open(filename, 'w') as handler:
+                handler.write(content.encode('utf-8'))
 
         for i, inp in enumerate(inputs):
-            filename = os.path.join(testcases_path, 'Input' + str(i + num_cases))
-            with open(filename, 'w') as handler:
-                handler.write(inp)
+            writeFile(os.path.join(testcases_path, 'Input' + str(i + num_cases)), inp)
 
         for i, out in enumerate(outputs):
-            filename = os.path.join(testcases_path, 'Output' + str(i + num_cases))
-            with open(filename, 'w') as handler:
-                handler.write(out)
+            writeFile(os.path.join(testcases_path, 'Output' + str(i + num_cases)), out)
+
+        if statement:
+            writeFile(os.path.join(testcases_path, 'statement.txt'), statement)
 
     @staticmethod
     def get_platform(args):
@@ -356,7 +362,7 @@ class Utilities:
                                       'site'], contest_code, problem_code)
 
         if os.path.isdir(testcases_path):
-            num_cases = len(os.listdir(testcases_path)) / 2
+            num_cases = Utilities.getTestCasesCount(testcases_path)
             results, expected_outputs, user_outputs = [''] * num_cases, [''] * num_cases, [''] * num_cases
 
             if extension in ['c', 'cpp', 'java', 'py', 'hs', 'rb', 'kt']:
@@ -468,6 +474,8 @@ class Codeforces:
         self.contest = args['contest']
         self.problem = args['problem']
         self.force_download = args['force']
+        self.url = 'https://codeforces.com'
+        self.locale = 'locale=ru'
 
     def parse_html(self, req):
         """
@@ -478,6 +486,7 @@ class Codeforces:
 
         inputs = soup.findAll('div', {'class': 'input'})
         outputs = soup.findAll('div', {'class': 'output'})
+        statements = soup.findAll('div', {'class': 'problem-statement'})
 
         if len(inputs) == 0 or len(outputs) == 0:
             print 'Problem not found..'
@@ -485,26 +494,38 @@ class Codeforces:
                 self.site, self.contest, self.problem)
             sys.exit(0)
 
-        repls = ('<br>', '\n'), ('<br/>', '\n'), ('</br>', '')
+        tags = ('<br>', '\n'), ('<br/>', '\n'), ('</br>', ''), ('</p>', '\n'), ('<p>', '\n'), ('<div>', '\n'), ('</div>', '\n'), ('<li>', '\n *')
+        htmls = [('$$$', ''),
+            ('\\le', '<='),
+            ('\\ge', '>='),
+            ('\\neq', '!='),
+            ('&gt;', '>'),
+            ('&lt;', '<'),
+            ('\\ldots', '...'),
+            ('\\dots', '...'),
+            ('\\ ', ' '),
+            ('\\cdot', '*'),
+            ('\\rightarrow', '->'),
+            ('\\leftarrow', '<-')]
 
-        formatted_inputs, formatted_outputs = [], []
+        def getContent(inp, tag=None):
+            if not tag: inp = inp.find('pre')
+            s = inp.decode_contents()
+            s = reduce(lambda a, kv: a.replace(*kv), tags, s)
+            s = re.sub('<[^<]+?>', '', s)
+            s = reduce(lambda a, kv: a.replace(*kv), htmls, s)
+            s = re.sub('\n{2,}', '\n\n', s)
+            return re.sub(r'^\s*', '', s)
 
-        def getContent(inp):
-            pre = inp.find('pre').decode_contents()
-            pre = reduce(lambda a, kv: a.replace(*kv), repls, pre)
-            pre = re.sub('<[^<]+?>', '', pre)
-            return re.sub(r'^\s*', '', pre)
+        formatted_inputs = list(map(getContent, inputs))
+        formatted_outputs = list(map(getContent, outputs))
+        formatted_text = [getContent(statements[0], True)]
 
-        for inp in inputs:
-            formatted_inputs += [getContent(inp)]
+        # print 'Inputs', ''.join(formatted_inputs)
+        # print 'Outputs', ''.join(formatted_outputs)
+        # print 'Statements', ''.join(formatted_text)
 
-        for out in outputs:
-            formatted_outputs += [getContent(out)]
-
-        # print 'Inputs', formatted_inputs
-        # print 'Outputs', formatted_outputs
-
-        return formatted_inputs, formatted_outputs
+        return formatted_inputs, formatted_outputs, ''.join(formatted_text)
 
     def get_problem_links(self, req):
         """
@@ -521,8 +542,7 @@ class Codeforces:
                 self.site, self.contest, self.problem)
             sys.exit(0)
 
-        links = ['http://codeforces.com' +
-                 td.find('a')['href'] for td in table.findAll('td', {'class': 'id'})]
+        links = ['%s%s?%s' % (self.url, td.find('a')['href'], self.locale) for td in table.findAll('td', {'class': 'id'})]
 
         return links
 
@@ -538,11 +558,10 @@ class Codeforces:
 
         for response in responses:
             if response is not None and response.status_code == 200:
-                inputs, outputs = self.parse_html(response)
-                self.problem = response.url.split('/')[-1]
+                inputs, outputs, text = self.parse_html(response)
+                self.problem = response.url.split('/')[-1].split('?')[0]
                 Utilities.check_cache(self.site, self.contest, self.problem)
-                Utilities.store_files(
-                    self.site, self.contest, self.problem, inputs, outputs)
+                Utilities.store_files(self.site, self.contest, self.problem, inputs, outputs, text)
             else:
                 failed_requests += [response.url]
 
@@ -554,11 +573,10 @@ class Codeforces:
         """
         print 'Fetching problem ' + self.contest + '-' + self.problem + ' from Codeforces...'
         type = 'contest' if int(self.contest) <= 100000 else 'gym'
-        url = 'http://codeforces.com/%s/%s/problem/%s' % (type, self.contest, self.problem)
+        url = '%s/%s/%s/problem/%s?%s' % (self.url, type, self.contest, self.problem, self.locale)
         req = Utilities.get_html(url)
-        inputs, outputs = self.parse_html(req)
-        Utilities.store_files(self.site, self.contest,
-                              self.problem, inputs, outputs)
+        inputs, outputs, text = self.parse_html(req)
+        Utilities.store_files(self.site, self.contest, self.problem, inputs, outputs, text)
         print 'Done.'
 
     def scrape_contest(self):
@@ -567,7 +585,7 @@ class Codeforces:
         """
         print 'Checking problems available for contest ' + self.contest + '...'
         type = 'contest' if int(self.contest) <= 100000 else 'gym'
-        url = 'http://codeforces.com/%s/%s' % (type, self.contest)
+        url = '%s/%s/%s?%s' % (self.url, type, self.contest, self.locale)
         req = Utilities.get_html(url)
         links = self.get_problem_links(req)
 
