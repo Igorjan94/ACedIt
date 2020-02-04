@@ -4,15 +4,15 @@ import re
 import os
 try:
     from bs4 import BeautifulSoup as bs
-    import requests as rq
     import grequests as grq
+    import requests as rq
     from argparse import ArgumentParser
 except:
     err = """
     You haven't installed the required dependencies.
     Run 'python setup.py install' to install the dependencies.
     """
-    print err
+    print(err)
     sys.exit(0)
 
 
@@ -131,7 +131,7 @@ class Utilities:
             f.write(json.dumps(data, indent=2))
             f.truncate()
 
-        print 'Set %s to %s' % (key, value)
+        print('Set %s to %s' % (key, value))
 
     @staticmethod
     def check_cache(site, contest, problem):
@@ -169,14 +169,14 @@ class Utilities:
             try:
                 rmtree(os.path.join(Utilities.cache_dir, site))
             except:
-                print 'Some error occured. Try again.'
+                print('Some error occured. Try again.')
                 return
             os.makedirs(os.path.join(Utilities.cache_dir, site))
-            print 'Done.'
+            print('Done.')
 
     @staticmethod
     def get_long_input(message):
-        print message
+        print(message)
         lines = []
         while True:
             try:
@@ -191,16 +191,16 @@ class Utilities:
 
     @staticmethod
     def add_test(args):
-        print 'Adding new test to %s (contest: %s, problem: %s)' % (args['site'], args['contest'], args['problem'])
+        print('Adding new test to %s (contest: %s, problem: %s)' % (args['site'], args['contest'], args['problem']))
         inputs = [Utilities.get_long_input('Specify input (^D or two consecutive empty lines to stop):')]
         outputs = [Utilities.get_long_input('Specify output (^D or two consecutive empty lines to stop):')]
         is_in_cache = Utilities.check_cache(args['site'], args['contest'], args['problem'])
         Utilities.store_files(args['site'], args['contest'], args['problem'], inputs, outputs)
-        print 'Test is successfully added'
+        print('Test is successfully added')
 
     @staticmethod
     def getTestCasesCount(p):
-        return len([f for f in os.listdir(p) if f.startswith('Input')])
+        return len([f for f in os.listdir(p) if f.endswith('.a')])
 
     @staticmethod
     def store_files(site, contest, problem, inputs, outputs, statement=None):
@@ -214,13 +214,13 @@ class Utilities:
         num_cases = Utilities.getTestCasesCount(testcases_path)
         def writeFile(filename, content):
             with open(filename, 'w') as handler:
-                handler.write(content.encode('utf-8'))
+                handler.write(content)
 
         for i, inp in enumerate(inputs):
-            writeFile(os.path.join(testcases_path, 'Input' + str(i + num_cases)), inp)
+            writeFile(os.path.join(testcases_path, str(i + num_cases)), inp)
 
         for i, out in enumerate(outputs):
-            writeFile(os.path.join(testcases_path, 'Output' + str(i + num_cases)), out)
+            writeFile(os.path.join(testcases_path, str(i + num_cases) + '.a'), out)
 
         if statement:
             writeFile(os.path.join(testcases_path, 'statement.txt'), statement)
@@ -246,7 +246,7 @@ class Utilities:
             platform.site, platform.contest, platform.problem)
 
         if not args['force'] and is_in_cache:
-            print 'Test cases found in cache...'
+            print('Test cases found in cache...')
             sys.exit(0)
 
         platform.scrape_problem()
@@ -270,7 +270,7 @@ class Utilities:
         inputs = []
 
         for i in xrange(num_cases):
-            with open(os.path.join(path, 'Input' + str(i)), 'r') as fh:
+            with open(os.path.join(path, str(i)), 'r') as fh:
                 inputs += [fh.read()]
 
         return inputs
@@ -293,7 +293,7 @@ class Utilities:
         Method to handle keyboard interrupt
         """
         from shutil import rmtree
-        print 'Cleaning up...'
+        print('Cleaning up...')
 
         # Handle case for SPOJ specially as it does not have contests
         contest = '' if site == 'spoj' else contest
@@ -307,14 +307,14 @@ class Utilities:
             # if os.path.isdir(path):
                 # rmtree(path)
 
-        print 'Done. Exiting gracefully.'
+        print('Done. Exiting gracefully.')
 
     @staticmethod
     def run_command_on_one_test(testcases_path, testcase_number, execute_command):
         status = os.system('timeout 2s ' + execute_command + ' < ' + os.path.join(
-            testcases_path, 'Input' + str(testcase_number)) + ' > temp_output' + str(testcase_number))
+            testcases_path, str(testcase_number)) + ' > temp_output' + str(testcase_number))
         user_output = ''
-        with open(os.path.join(testcases_path, 'Output' + str(testcase_number)), 'r') as out_handler:
+        with open(os.path.join(testcases_path, str(testcase_number) + '.a'), 'r') as out_handler:
             expected_output = out_handler.read().strip().split('\n')
             expected_output = '\n'.join([line.strip() for line in expected_output])
             if status == 124:
@@ -352,7 +352,7 @@ class Utilities:
         problem_path = os.path.join(os.getcwd(), problem)
 
         if not os.path.isfile(problem_path + '.' + extension):
-            print 'ERROR : No such file'
+            print('ERROR : No such file')
             sys.exit(0)
 
         problem_code = args['problem'] if args['problem'] else problem
@@ -399,11 +399,11 @@ class Utilities:
                     # Compilation error occurred
                     message = Utilities.colors['BOLD'] + Utilities.colors[
                         'RED'] + 'Compilation error. Not run against test cases' + Utilities.colors['ENDC'] + '.'
-                    print message
+                    prin((message))
                     sys.exit(0)
 
             else:
-                print 'Supports only C, C++, Python, Java and Kotlin as of now.'
+                print('Supports only C, C++, Python, Java and Kotlin as of now.')
                 sys.exit(0)
 
             from terminaltables import AsciiTable
@@ -427,13 +427,13 @@ class Utilities:
 
             table = AsciiTable(table_data)
 
-            print table.table
+            print(table.table)
 
             # Clean up temporary files
             Utilities.cleanup(num_cases, basename, extension)
 
         else:
-            print 'Test cases not found locally...'
+            print('Test cases not found locally...')
 
             args['problem'] = problem_code
             args['force'] = True
@@ -441,7 +441,7 @@ class Utilities:
 
             Utilities.download_problem_testcases(args)
 
-            print 'Running your solution against sample cases...'
+            print('Running your solution against sample cases...')
             Utilities.run_solution(args)
 
     @staticmethod
@@ -456,10 +456,10 @@ class Utilities:
                 if r.status_code == 200:
                     break
             if try_count >= MAX_TRIES:
-                print 'Could not fetch content. Please try again.'
+                print('Could not fetch content. Please try again.')
                 sys.exit(0)
         except Exception as e:
-            print 'Please check your internet connection and try again.'
+            print('Please check your internet connection and try again.')
             sys.exit(0)
         return r
 
@@ -489,7 +489,7 @@ class Codeforces:
         statements = soup.findAll('div', {'class': 'problem-statement'})
 
         if len(inputs) == 0 or len(outputs) == 0:
-            print 'Problem not found..'
+            print('Problem not found...')
             Utilities.handle_kbd_interrupt(
                 self.site, self.contest, self.problem)
             sys.exit(0)
@@ -521,9 +521,9 @@ class Codeforces:
         formatted_outputs = list(map(getContent, outputs))
         formatted_text = [getContent(statements[0], True)]
 
-        # print 'Inputs', ''.join(formatted_inputs)
-        # print 'Outputs', ''.join(formatted_outputs)
-        # print 'Statements', ''.join(formatted_text)
+        # print('Inputs', ''.join(formatted_inputs))
+        # print('Outputs', ''.join(formatted_outputs))
+        # print('Statements', ''.join(formatted_text))
 
         return formatted_inputs, formatted_outputs, ''.join(formatted_text)
 
@@ -537,7 +537,7 @@ class Codeforces:
         table = soup.find('table', {'class': 'problems'})
 
         if table is None:
-            print 'Contest not found..'
+            print('Contest not found...')
             Utilities.handle_kbd_interrupt(
                 self.site, self.contest, self.problem)
             sys.exit(0)
@@ -571,25 +571,25 @@ class Codeforces:
         """
         Method to scrape a single problem from codeforces
         """
-        print 'Fetching problem ' + self.contest + '-' + self.problem + ' from Codeforces...'
+        print('Fetching problem ' + self.contest + '-' + self.problem + ' from Codeforces...')
         type = 'contest' if int(self.contest) <= 100000 else 'gym'
         url = '%s/%s/%s/problem/%s?%s' % (self.url, type, self.contest, self.problem, self.locale)
         req = Utilities.get_html(url)
         inputs, outputs, text = self.parse_html(req)
         Utilities.store_files(self.site, self.contest, self.problem, inputs, outputs, text)
-        print 'Done.'
+        print('Done.')
 
     def scrape_contest(self):
         """
         Method to scrape all problems from a given codeforces contest
         """
-        print 'Checking problems available for contest ' + self.contest + '...'
+        print('Checking problems available for contest ' + self.contest + '...')
         type = 'contest' if int(self.contest) <= 100000 else 'gym'
         url = '%s/%s/%s?%s' % (self.url, type, self.contest, self.locale)
         req = Utilities.get_html(url)
         links = self.get_problem_links(req)
 
-        print 'Found %d problems..' % (len(links))
+        print('Found %d problems..' % (len(links)))
 
         if not self.force_download:
             cached_problems = os.listdir(os.path.join(
@@ -622,7 +622,7 @@ class Codechef:
             data = json.loads(req.text)
             soup = bs(data['body'], 'html.parser')
         except (KeyError, ValueError):
-            print 'Problem not found..'
+            print('Problem not found..')
             Utilities.handle_kbd_interrupt(
                 self.site, self.contest, self.problem)
             sys.exit(0)
@@ -653,8 +653,8 @@ class Codechef:
             formatted_inputs += [inp.strip()]
             formatted_outputs += [out.strip()]
 
-        # print 'Inputs', formatted_inputs
-        # print 'Outputs', formatted_outputs
+        # print('Inputs', formatted_inputs)
+        # print('Outputs', formatted_outputs)
 
         return formatted_inputs, formatted_outputs
 
@@ -668,7 +668,7 @@ class Codechef:
         table = soup.find('table', {'class': 'dataTable'})
 
         if table is None:
-            print 'Contest not found..'
+            print('Contest not found...')
             Utilities.handle_kbd_interrupt(
                 self.site, self.contest, self.problem)
             sys.exit(0)
@@ -710,25 +710,25 @@ class Codechef:
         """
         Method to scrape a single problem from codechef
         """
-        print 'Fetching problem ' + self.contest + '-' + self.problem + ' from Codechef...'
+        print('Fetching problem ' + self.contest + '-' + self.problem + ' from Codechef...')
         url = 'https://codechef.com/api/contests/' + \
             self.contest + '/problems/' + self.problem
         req = Utilities.get_html(url)
         inputs, outputs = self.parse_html(req)
         Utilities.store_files(self.site, self.contest,
                               self.problem, inputs, outputs)
-        print 'Done.'
+        print('Done.')
 
     def scrape_contest(self):
         """
         Method to scrape all problems from a given codechef contest
         """
-        print 'Checking problems available for contest ' + self.contest + '...'
+        print('Checking problems available for contest ' + self.contest + '...')
         url = 'https://codechef.com/' + self.contest
         req = Utilities.get_html(url)
         links = self.get_problem_links(req)
 
-        print 'Found %d problems..' % (len(links))
+        print('Found %d problems..' % (len(links)))
 
         if not self.force_download:
             cached_problems = os.listdir(os.path.join(
@@ -762,7 +762,7 @@ class Spoj:
         test_cases = soup.findAll('pre')
 
         if test_cases is None or len(test_cases) == 0:
-            print 'Problem not found..'
+            print('Problem not found..')
             Utilities.handle_kbd_interrupt(
                 self.site, self.contest, self.problem)
             sys.exit(0)
@@ -792,8 +792,8 @@ class Spoj:
             formatted_inputs += [inp.strip()]
             formatted_outputs += [out.strip()]
 
-        # print 'Inputs', formatted_inputs
-        # print 'Outputs', formatted_outputs
+        # print('Inputs', formatted_inputs)
+        # print('Outputs', formatted_outputs)
 
         return formatted_inputs, formatted_outputs
 
@@ -801,13 +801,13 @@ class Spoj:
         """
         Method to scrape a single problem from spoj
         """
-        print 'Fetching problem ' + self.problem + ' from SPOJ...'
+        print('Fetching problem ' + self.problem + ' from SPOJ...')
         url = 'http://spoj.com/problems/' + self.problem
         req = Utilities.get_html(url)
         inputs, outputs = self.parse_html(req)
         Utilities.store_files(self.site, self.contest,
                               self.problem, inputs, outputs)
-        print 'Done.'
+        print('Done.')
 
 
 class Hackerrank:
@@ -832,7 +832,7 @@ class Hackerrank:
             data = json.loads(req.text)
             soup = bs(data['model']['body_html'], 'html.parser')
         except (KeyError, ValueError):
-            print 'Problem not found..'
+            print('Problem not found..')
             Utilities.handle_kbd_interrupt(
                 self.site, self.contest, self.problem)
             sys.exit(0)
@@ -872,8 +872,8 @@ class Hackerrank:
 
             formatted_outputs += [formatted_output.strip()]
 
-        # print 'Inputs', formatted_inputs
-        # print 'Outputs', formatted_outputs
+        # print('Inputs', formatted_inputs)
+        # print('Outputs', formatted_outputs)
 
         return formatted_inputs, formatted_outputs
 
@@ -887,7 +887,7 @@ class Hackerrank:
             data = json.loads(req.text)
             data = data['models']
         except (KeyError, ValueError):
-            print 'Contest not found..'
+            print('Contest not found..')
             Utilities.handle_kbd_interrupt(
                 self.site, self.contest, self.problem)
             sys.exit(0)
@@ -923,25 +923,25 @@ class Hackerrank:
         """
         Method to scrape a single problem from hackerrank
         """
-        print 'Fetching problem ' + self.contest + '-' + self.problem + ' from Hackerrank...'
+        print('Fetching problem ' + self.contest + '-' + self.problem + ' from Hackerrank...')
         url = 'https://www.hackerrank.com/rest/contests/' + \
             self.contest + '/challenges/' + self.problem
         req = Utilities.get_html(url)
         inputs, outputs = self.parse_html(req)
         Utilities.store_files(self.site, self.contest,
                               self.problem, inputs, outputs)
-        print 'Done.'
+        print('Done.')
 
     def scrape_contest(self):
         """
         Method to scrape all problems from a given hackerrank contest
         """
-        print 'Checking problems available for contest ' + self.contest + '...'
+        print('Checking problems available for contest ' + self.contest + '...')
         url = 'https://www.hackerrank.com/rest/contests/' + self.contest + '/challenges'
         req = Utilities.get_html(url)
         links = self.get_problem_links(req)
 
-        print 'Found %d problems..' % (len(links))
+        print('Found %d problems..' % (len(links)))
 
         if not self.force_download:
             cached_problems = os.listdir(os.path.join(

@@ -19,6 +19,7 @@ if sys.version_info >= (3,):
 
 setup(
     name='ACedIt',
+    use_2to3=True,
 
     packages=['acedit'],
 
